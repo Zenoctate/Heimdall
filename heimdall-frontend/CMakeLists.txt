@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.4)
+cmake_minimum_required(VERSION 3.10.0...4.0.2)
 
 project(heimdall-frontend)
 
@@ -8,10 +8,13 @@ set(LIBPIT_INCLUDE_DIRS
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON) # moc files are generated in build (current) directory
 
-find_package(Qt5Widgets REQUIRED)
+find_package(Qt6Widgets REQUIRED)
 find_package(ZLIB REQUIRED)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
+if(APPLE)
+    set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lobjc -framework IOKit -framework CoreFoundation")
+endif()
 
 if(MINGW)
     set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++ -static")
@@ -28,12 +31,9 @@ set(HEIMDALL_FRONTEND_SOURCE_FILES
     source/PackageData.cpp
     source/Packaging.cpp)
 
-qt5_wrap_ui(HEIMDALL_FRONTEND_FORMS
+qt6_wrap_ui(HEIMDALL_FRONTEND_FORMS
     mainwindow.ui
     aboutform.ui)
-
-qt5_add_resources(HEIMDALL_FRONTEND_RESOURCES
-    mainwindow.qrc)
 
 add_executable(heimdall-frontend WIN32
     MACOSX_BUNDLE
@@ -41,16 +41,46 @@ add_executable(heimdall-frontend WIN32
     ${HEIMDALL_FRONTEND_FORMS}
     ${HEIMDALL_FRONTEND_RESOURCES})
 
-include(LargeFiles)
-use_large_files(heimdall-frontend YES)
+target_compile_features(heimdall-frontend PRIVATE cxx_std_11)
+
+include(CheckSymbolExists)
+
+#
+# Large file support on UN*X, a/k/a LFS.
+#
+# On Windows, we require _fseeki64() and _ftelli64().  Visual Studio
+# has had supported them since Visual Studio 2005/MSVCR80.
+#
+if(NOT WIN32)
+    include(FindLFS)
+    if(LFS_FOUND)
+        #
+        # Add the required #defines.
+        #
+        add_definitions(${LFS_DEFINITIONS})
+    endif()
+
+    #
+    # Check for fseeko as well.
+    #
+    include(FindFseeko)
+    if(FSEEKO_FOUND)
+        set(HAVE_FSEEKO ON)
+
+        #
+        # Add the required #defines.
+        #
+        add_definitions(${FSEEKO_DEFINITIONS})
+    endif()
+endif()
 
 set_property(TARGET heimdall-frontend
     APPEND PROPERTY COMPILE_DEFINITIONS "QT_LARGEFILE_SUPPORT")
 
 target_link_libraries(heimdall-frontend pit)
-target_link_libraries(heimdall-frontend Qt5::Widgets)
+target_link_libraries(heimdall-frontend Qt6::Widgets)
 target_link_libraries(heimdall-frontend z)
 install (TARGETS heimdall-frontend
-		RUNTIME	DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-		LIBRARY	DESTINATION ${CMAKE_INSTALL_LIBDIR})
-
+        RUNTIME    DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+        LIBRARY    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        BUNDLE DESTINATION /Applications)

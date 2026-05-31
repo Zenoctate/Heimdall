@@ -50,7 +50,7 @@
    <string notr="true"/>
   </property>
   <property name="tabShape">
-   <enum>QTabWidget::Rounded</enum>
+   <enum>QTabWidget::TabShape::Rounded</enum>
   </property>
   <widget class="QWidget" name="centralWidget">
    <widget class="QTabWidget" name="functionTabWidget">
@@ -197,7 +197,7 @@
        </rect>
       </property>
       <property name="focusPolicy">
-       <enum>Qt::NoFocus</enum>
+       <enum>Qt::FocusPolicy::NoFocus</enum>
       </property>
       <property name="text">
        <string>Load / Customise</string>
@@ -273,7 +273,7 @@
         </rect>
        </property>
        <property name="focusPolicy">
-        <enum>Qt::NoFocus</enum>
+        <enum>Qt::FocusPolicy::NoFocus</enum>
        </property>
        <property name="text">
         <string>Browse</string>
@@ -350,7 +350,7 @@
         </rect>
        </property>
        <property name="focusPolicy">
-        <enum>Qt::NoFocus</enum>
+        <enum>Qt::FocusPolicy::NoFocus</enum>
        </property>
        <property name="text">
         <string>Donate</string>
@@ -369,7 +369,7 @@
         </rect>
        </property>
        <property name="focusPolicy">
-        <enum>Qt::NoFocus</enum>
+        <enum>Qt::FocusPolicy::NoFocus</enum>
        </property>
        <property name="text">
         <string>Homepage</string>
@@ -401,9 +401,9 @@
       <property name="geometry">
        <rect>
         <x>10</x>
-        <y>300</y>
+        <y>290</y>
         <width>511</width>
-        <height>171</height>
+        <height>170</height>
        </rect>
       </property>
       <property name="title">
@@ -457,16 +457,16 @@
         </rect>
        </property>
        <property name="layoutDirection">
-        <enum>Qt::RightToLeft</enum>
+        <enum>Qt::LayoutDirection::RightToLeft</enum>
        </property>
        <property name="text">
         <string notr="true">Ready</string>
        </property>
        <property name="textFormat">
-        <enum>Qt::PlainText</enum>
+        <enum>Qt::TextFormat::PlainText</enum>
        </property>
        <property name="alignment">
-        <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+        <set>Qt::AlignmentFlag::AlignBottom|Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft</set>
        </property>
       </widget>
      </widget>
@@ -523,7 +523,7 @@
          </rect>
         </property>
         <property name="focusPolicy">
-         <enum>Qt::NoFocus</enum>
+         <enum>Qt::FocusPolicy::NoFocus</enum>
         </property>
         <property name="text">
          <string>Browse</string>
@@ -552,7 +552,6 @@
         </property>
         <property name="font">
          <font>
-          <weight>75</weight>
           <bold>true</bold>
          </font>
         </property>
@@ -566,10 +565,10 @@
          <string notr="true"/>
         </property>
         <property name="frameShape">
-         <enum>QFrame::Panel</enum>
+         <enum>QFrame::Shape::Panel</enum>
         </property>
         <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
+         <enum>QFrame::Shadow::Raised</enum>
         </property>
         <property name="lineWidth">
          <number>2</number>
@@ -581,7 +580,7 @@
          <string>?</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignCenter</set>
+         <set>Qt::AlignmentFlag::AlignCenter</set>
         </property>
        </widget>
        <widget class="QCheckBox" name="repartitionCheckBox">
@@ -785,7 +784,6 @@
         </property>
         <property name="font">
          <font>
-          <weight>75</weight>
           <bold>true</bold>
          </font>
         </property>
@@ -793,10 +791,10 @@
          <string notr="true">Use the &quot;Add&quot; button to add additional files to be flashed.</string>
         </property>
         <property name="frameShape">
-         <enum>QFrame::Panel</enum>
+         <enum>QFrame::Shape::Panel</enum>
         </property>
         <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
+         <enum>QFrame::Shadow::Raised</enum>
         </property>
         <property name="lineWidth">
          <number>2</number>
@@ -808,7 +806,7 @@
          <string>?</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignCenter</set>
+         <set>Qt::AlignmentFlag::AlignCenter</set>
         </property>
        </widget>
       </widget>
@@ -817,7 +815,7 @@
       <property name="geometry">
        <rect>
         <x>530</x>
-        <y>300</y>
+        <y>290</y>
         <width>231</width>
         <height>171</height>
        </rect>
@@ -857,10 +855,29 @@
         </rect>
        </property>
        <property name="toolTip">
-        <string notr="true">Can be enabled to prevent your device rebooting after the flash finishes.</string>
+        <string notr="true">Resume flash action, to be used after &quot;No Reboot&quot; was used.</string>
        </property>
        <property name="text">
         <string>Resume (use after &quot;No Reboot&quot;)</string>
+       </property>
+      </widget>
+      <widget class="QCheckBox" name="waitForDeviceCheckbox">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>90</y>
+         <width>211</width>
+         <height>21</height>
+        </rect>
+       </property>
+       <property name="toolTip">
+        <string notr="true">If enabled then Heimdall waits until a compatible device is connected and then flashes.</string>
+       </property>
+       <property name="text">
+        <string>Wait for device</string>
        </property>
       </widget>
       <widget class="QPushButton" name="startFlashButton">
@@ -890,7 +907,6 @@
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -898,10 +914,10 @@
         <string notr="true">The &quot;Start&quot; button will remain inactive until at least one partition/file is added.</string>
        </property>
        <property name="frameShape">
-        <enum>QFrame::Panel</enum>
+        <enum>QFrame::Shape::Panel</enum>
        </property>
        <property name="frameShadow">
-        <enum>QFrame::Raised</enum>
+        <enum>QFrame::Shadow::Raised</enum>
        </property>
        <property name="lineWidth">
         <number>2</number>
@@ -913,7 +929,7 @@
         <string>?</string>
        </property>
        <property name="alignment">
-        <set>Qt::AlignCenter</set>
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
       </widget>
      </widget>
@@ -960,7 +976,7 @@
         </rect>
        </property>
        <property name="focusPolicy">
-        <enum>Qt::NoFocus</enum>
+        <enum>Qt::FocusPolicy::NoFocus</enum>
        </property>
        <property name="text">
         <string>Remove Device</string>
@@ -1133,7 +1149,7 @@
          </rect>
         </property>
         <property name="focusPolicy">
-         <enum>Qt::NoFocus</enum>
+         <enum>Qt::FocusPolicy::NoFocus</enum>
         </property>
         <property name="text">
          <string>Add</string>
@@ -1153,7 +1169,7 @@
         </rect>
        </property>
        <property name="focusPolicy">
-        <enum>Qt::NoFocus</enum>
+        <enum>Qt::FocusPolicy::NoFocus</enum>
        </property>
        <property name="text">
         <string>Remove</string>
@@ -1372,7 +1388,7 @@
         </rect>
        </property>
        <property name="focusPolicy">
-        <enum>Qt::NoFocus</enum>
+        <enum>Qt::FocusPolicy::NoFocus</enum>
        </property>
        <property name="text">
         <string>Add Device</string>
@@ -1392,7 +1408,7 @@
        </rect>
       </property>
       <property name="focusPolicy">
-       <enum>Qt::NoFocus</enum>
+       <enum>Qt::FocusPolicy::NoFocus</enum>
       </property>
       <property name="text">
        <string>Build</string>
@@ -1407,7 +1423,7 @@
       <property name="geometry">
        <rect>
         <x>10</x>
-        <y>80</y>
+        <y>70</y>
         <width>461</width>
         <height>141</height>
        </rect>
@@ -1456,7 +1472,7 @@
          </rect>
         </property>
         <property name="focusPolicy">
-         <enum>Qt::NoFocus</enum>
+         <enum>Qt::FocusPolicy::NoFocus</enum>
         </property>
         <property name="text">
          <string>Save As...</string>
@@ -1476,7 +1492,7 @@
         </rect>
        </property>
        <property name="focusPolicy">
-        <enum>Qt::NoFocus</enum>
+        <enum>Qt::FocusPolicy::NoFocus</enum>
        </property>
        <property name="text">
         <string>Download</string>
@@ -1493,7 +1509,6 @@
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -1501,10 +1516,10 @@
         <string notr="true">Download and save a device's PIT file.</string>
        </property>
        <property name="frameShape">
-        <enum>QFrame::Panel</enum>
+        <enum>QFrame::Shape::Panel</enum>
        </property>
        <property name="frameShadow">
-        <enum>QFrame::Raised</enum>
+        <enum>QFrame::Shadow::Raised</enum>
        </property>
        <property name="lineWidth">
         <number>2</number>
@@ -1516,7 +1531,7 @@
         <string>?</string>
        </property>
        <property name="alignment">
-        <set>Qt::AlignCenter</set>
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
       </widget>
      </widget>
@@ -1524,7 +1539,7 @@
       <property name="geometry">
        <rect>
         <x>10</x>
-        <y>230</y>
+        <y>220</y>
         <width>751</width>
         <height>241</height>
        </rect>
@@ -1577,7 +1592,7 @@
         </rect>
        </property>
        <property name="focusPolicy">
-        <enum>Qt::NoFocus</enum>
+        <enum>Qt::FocusPolicy::NoFocus</enum>
        </property>
        <property name="toolTip">
         <string/>
@@ -1619,7 +1634,6 @@
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -1633,10 +1647,10 @@
         <string notr="true"/>
        </property>
        <property name="frameShape">
-        <enum>QFrame::Panel</enum>
+        <enum>QFrame::Shape::Panel</enum>
        </property>
        <property name="frameShadow">
-        <enum>QFrame::Raised</enum>
+        <enum>QFrame::Shadow::Raised</enum>
        </property>
        <property name="lineWidth">
         <number>2</number>
@@ -1648,7 +1662,7 @@
         <string>?</string>
        </property>
        <property name="alignment">
-        <set>Qt::AlignCenter</set>
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
       </widget>
      </widget>
@@ -1658,7 +1672,7 @@
         <x>480</x>
         <y>10</y>
         <width>291</width>
-        <height>211</height>
+        <height>201</height>
        </rect>
       </property>
       <property name="title">
@@ -1668,13 +1682,13 @@
        <property name="geometry">
         <rect>
          <x>160</x>
-         <y>180</y>
+         <y>170</y>
          <width>81</width>
          <height>23</height>
         </rect>
        </property>
        <property name="focusPolicy">
-        <enum>Qt::NoFocus</enum>
+        <enum>Qt::FocusPolicy::NoFocus</enum>
        </property>
        <property name="text">
         <string>Print</string>
@@ -1684,14 +1698,13 @@
        <property name="geometry">
         <rect>
          <x>250</x>
-         <y>180</y>
+         <y>170</y>
          <width>21</width>
          <height>23</height>
         </rect>
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -1699,10 +1712,10 @@
         <string notr="true">Print the contents of a PIT file in a human readable fashion.</string>
        </property>
        <property name="frameShape">
-        <enum>QFrame::Panel</enum>
+        <enum>QFrame::Shape::Panel</enum>
        </property>
        <property name="frameShadow">
-        <enum>QFrame::Raised</enum>
+        <enum>QFrame::Shadow::Raised</enum>
        </property>
        <property name="lineWidth">
         <number>2</number>
@@ -1714,7 +1727,7 @@
         <string>?</string>
        </property>
        <property name="alignment">
-        <set>Qt::AlignCenter</set>
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
       </widget>
       <widget class="QRadioButton" name="printPitDeviceRadioBox">
@@ -1765,7 +1778,7 @@
        <property name="geometry">
         <rect>
          <x>10</x>
-         <y>100</y>
+         <y>90</y>
          <width>271</width>
          <height>71</height>
         </rect>
@@ -1802,7 +1815,7 @@
          </rect>
         </property>
         <property name="focusPolicy">
-         <enum>Qt::NoFocus</enum>
+         <enum>Qt::FocusPolicy::NoFocus</enum>
         </property>
         <property name="text">
          <string>Browse</string>
@@ -1832,7 +1845,7 @@
         </rect>
        </property>
        <property name="focusPolicy">
-        <enum>Qt::NoFocus</enum>
+        <enum>Qt::FocusPolicy::NoFocus</enum>
        </property>
        <property name="text">
         <string>Close</string>
@@ -1849,7 +1862,6 @@
        </property>
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
         </font>
        </property>
@@ -1857,10 +1869,10 @@
         <string notr="true">Close the &quot;device &lt;--&gt; PC&quot; screen displayed on a device.</string>
        </property>
        <property name="frameShape">
-        <enum>QFrame::Panel</enum>
+        <enum>QFrame::Shape::Panel</enum>
        </property>
        <property name="frameShadow">
-        <enum>QFrame::Raised</enum>
+        <enum>QFrame::Shadow::Raised</enum>
        </property>
        <property name="lineWidth">
         <number>2</number>
@@ -1872,7 +1884,7 @@
         <string>?</string>
        </property>
        <property name="alignment">
-        <set>Qt::AlignCenter</set>
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
       </widget>
      </widget>
@@ -1885,7 +1897,7 @@
      <x>0</x>
      <y>0</y>
      <width>788</width>
-     <height>22</height>
+     <height>24</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuHelp">
@@ -1893,12 +1905,6 @@
      <string>Help</string>
     </property>
     <addaction name="actionAboutHeimdall"/>
-   </widget>
-   <widget class="QMenu" name="menuDonate">
-    <property name="title">
-     <string>Donate</string>
-    </property>
-    <addaction name="actionDonate"/>
    </widget>
    <widget class="QMenu" name="menuAdvanced">
     <property name="title">
@@ -1908,7 +1914,6 @@
     <addaction name="separator"/>
     <addaction name="actionVerboseOutput"/>
    </widget>
-   <addaction name="menuDonate"/>
    <addaction name="menuAdvanced"/>
    <addaction name="menuHelp"/>
   </widget>
@@ -1920,11 +1925,6 @@
   <action name="actionAboutHeimdall">
    <property name="text">
     <string>About Heimdall</string>
-   </property>
-  </action>
-  <action name="actionDonate">
-   <property name="text">
-    <string>Donate to Glass Echidna</string>
    </property>
   </action>
   <action name="actionPackage_Creation">

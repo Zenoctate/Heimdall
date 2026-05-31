@@ -43,15 +43,17 @@ Arguments:\n\
     [--<partition name> <filename> ...]\n\
     [--<partition identifier> <filename> ...]\n\
     [--pit <filename>] [--verbose] [--no-reboot] [--resume] [--stdout-errors]\n\
-    [--usb-log-level <none/error/warning/debug>]\n\
+    [--usb-log-level <none/error/warning/debug>] [--skip-size-check] [--wait]\n\
   or:\n\
     --repartition --pit <filename> [--<partition name> <filename> ...]\n\
     [--<partition identifier> <filename> ...] [--verbose] [--no-reboot]\n\
     [--resume] [--stdout-errors] [--usb-log-level <none/error/warning/debug>]\n\
-    [--tflash]\n\
+    [--tflash] [--skip-size-check] [--wait]\n\
 Description: Flashes one or more firmware files to your phone. Partition names\n\
     (or identifiers) can be obtained by executing the print-pit action.\n\
+    With --wait Heimdall waits until a compatible device is connected.\n\
     T-Flash mode allows to flash the inserted SD-card instead of the internal MMC.\n\
+    Use --skip-size-check to not verify that files fit in the specified partition.\n\
 Note: --no-reboot causes the device to remain in download mode after the action\n\
       is completed. If you wish to perform another action whilst remaining in\n\
       download mode, then the following action must specify the --resume flag.\n\
@@ -62,11 +64,13 @@ struct PartitionFile
 {
 	const char *argumentName;
 	FILE *file;
+	unsigned long fileSize;
 
-	PartitionFile(const char *argumentName, FILE *file)
+	PartitionFile(const char *argumentName, FILE *file, unsigned long fileSize)
 	{
 		this->argumentName = argumentName;
 		this->file = file;
+		this->fileSize = fileSize;
 	}
 };
 
@@ -104,7 +108,7 @@ static bool openFiles(Arguments& arguments, vector<PartitionFile>& partitionFile
 	for (vector<const Argument *>::const_iterator it = arguments.GetArguments().begin(); it != arguments.GetArguments().end(); it++)
 	{
 		const string& argumentName = (*it)->GetName();
-		
+
 		// The only way an argument could exist without being in the argument types map is if it's a wild-card.
 		// The "%d" wild-card refers to a partition by identifier, where as the "%s" wild-card refers to a
 		// partition by name.
@@ -113,14 +117,17 @@ static bool openFiles(Arguments& arguments, vector<PartitionFile>& partitionFile
 		{
 			const StringArgument *stringArgument = static_cast<const StringArgument *>(*it);
 			FILE *file = FileOpen(stringArgument->GetValue().c_str(), "rb");
-
 			if (!file)
 			{
 				Interface::PrintError("Failed to open file \"%s\"\n", stringArgument->GetValue().c_str());
 				return (false);
 			}
 
-			partitionFiles.push_back(PartitionFile(argumentName.c_str(), file));
+			FileSeek(file, 0, SEEK_END);
+			unsigned long fileSize = (unsigned long)FileTell(file);
+			FileRewind(file);
+
+			partitionFiles.push_back(PartitionFile(argumentName.c_str(), file, fileSize));
 		}
 	}
 
@@ -147,24 +154,22 @@ static void closeFiles(vector<PartitionFile>& partitionFiles, FILE *& pitFile)
 
 static bool sendTotalTransferSize(BridgeManager *bridgeManager, const vector<PartitionFile>& partitionFiles, FILE *pitFile, bool repartition)
 {
-	unsigned int totalBytes = 0;
+	unsigned long totalBytes = 0;
 
 	for (vector<PartitionFile>::const_iterator it = partitionFiles.begin(); it != partitionFiles.end(); it++)
 	{
-		FileSeek(it->file, 0, SEEK_END);
-		totalBytes += (unsigned int)FileTell(it->file);
-		FileRewind(it->file);
+		totalBytes += it->fileSize;
 	}
 
 	if (repartition)
 	{
 		FileSeek(pitFile, 0, SEEK_END);
-		totalBytes += (unsigned int)FileTell(pitFile);
+		totalBytes += (unsigned long)FileTell(pitFile);
 		FileRewind(pitFile);
 	}
 
 	bool success;
-	
+
 	TotalBytesPacket *totalBytesPacket = new TotalBytesPacket(totalBytes);
 	success = bridgeManager->SendPacket(totalBytesPacket);
 	delete totalBytesPacket;
@@ -251,7 +256,7 @@ static bool flashPitData(BridgeManager *bridgeManager, const PitData *pitData)
 static bool flashFile(BridgeManager *bridgeManager, const PartitionFlashInfo& partitionFlashInfo)
 {
 	if (partitionFlashInfo.pitEntry->GetBinaryType() == PitEntry::kBinaryTypeCommunicationProcessor) // Modem
-	{			
+	{
 		Interface::Print("Uploading %s\n", partitionFlashInfo.pitEntry->GetPartitionName());
 
 		if (bridgeManager->SendFile(partitionFlashInfo.file, EndModemFileTransferPacket::kDestinationModem,
@@ -284,13 +289,57 @@ static bool flashFile(BridgeManager *bridgeManager, const PartitionFlashInfo& pa
 	}
 }
 
-static bool flashPartitions(BridgeManager *bridgeManager, const vector<PartitionFile>& partitionFiles, const PitData *pitData, bool repartition)
+static bool flashPartitions(BridgeManager *bridgeManager, const vector<PartitionFile>& partitionFiles, const PitData *pitData, bool repartition, bool skipSizeCheck)
 {
 	vector<PartitionFlashInfo> partitionFlashInfos;
 
 	// Map the files being flashed to partitions stored in the PIT file.
 	if (!setupPartitionFlashInfo(partitionFiles, pitData, partitionFlashInfos))
 		return (false);
+
+	/* Verify that the files we want to flash fit in partitions */
+	if (!skipSizeCheck)
+	{
+		for (vector<PartitionFile>::const_iterator it = partitionFiles.begin(); it != partitionFiles.end(); it++)
+		{
+			unsigned int partitionIdentifier;
+			const PitEntry *part;
+			if (Utility::ParseUnsignedInt(partitionIdentifier, it->argumentName) == kNumberParsingStatusSuccess)
+			{
+				part = pitData->FindEntry(partitionIdentifier);
+
+				if (!part)
+				{
+					Interface::PrintError("No partition with identifier \"%s\" exists in the specified PIT.\n", it->argumentName);
+					return (false);
+
+				}
+			} else {
+				part = pitData->FindEntry(it->argumentName);
+
+				if (!part)
+				{
+					Interface::PrintError("Partition \"%s\" does not exist in the specified PIT.\n", it->argumentName);
+					return (false);
+
+				}
+			}
+
+			if (part->GetDeviceType() != PitEntry::kDeviceTypeMMC &&
+			    part->GetDeviceType() != PitEntry::kDeviceTypeUFS)
+				continue;
+			unsigned long partitionSize = part->GetBlockCount();
+			unsigned int blockSize = 512;
+			if (part->GetDeviceType() == PitEntry::kDeviceTypeUFS)
+				blockSize = 4096;
+			if (partitionSize > 0 && it->fileSize > partitionSize*blockSize)
+			{
+				Interface::PrintError("%s partition is too small for given file. Use --skip-size-check to flash anyways.\n",
+						      it->argumentName);
+				return (false);
+			}
+		}
+	}
 
 	// If we're repartitioning then we need to flash the PIT file first (if it is listed in the PIT file).
 	if (repartition)
@@ -320,7 +369,7 @@ static PitData *getPitData(BridgeManager *bridgeManager, FILE *pitFile, bool rep
 		// Load the local pit file into memory.
 
 		FileSeek(pitFile, 0, SEEK_END);
-		unsigned int localPitFileSize = (unsigned int)FileTell(pitFile);
+		unsigned long localPitFileSize = (unsigned long)FileTell(pitFile);
 		FileRewind(pitFile);
 
 		unsigned char *pitFileBuffer = new unsigned char[localPitFileSize];
@@ -430,7 +479,9 @@ int FlashAction::Execute(int argc, char **argv)
 	argumentTypes["verbose"] = kArgumentTypeFlag;
 	argumentTypes["stdout-errors"] = kArgumentTypeFlag;
 	argumentTypes["usb-log-level"] = kArgumentTypeString;
+	argumentTypes["wait"] = kArgumentTypeFlag;
 	argumentTypes["tflash"] = kArgumentTypeFlag;
+	argumentTypes["skip-size-check"] = kArgumentTypeFlag;
 
 	argumentTypes["pit"] = kArgumentTypeString;
 	shortArgumentAliases["pit"] = "pit";
@@ -459,7 +510,10 @@ int FlashAction::Execute(int argc, char **argv)
 	bool resume = arguments.GetArgument("resume") != nullptr;
 	bool verbose = arguments.GetArgument("verbose") != nullptr;
 	bool tflash = arguments.GetArgument("tflash") != nullptr;
-	
+	bool waitForDevice = arguments.GetArgument("wait") != nullptr;
+	// If we are flashing to sdcard we can ignore size of partition in PIT
+	bool skipSizeCheck = (arguments.GetArgument("skip-size-check") != nullptr) || tflash;
+
 	if (arguments.GetArgument("stdout-errors") != nullptr)
 		Interface::SetStdoutErrors(true);
 
@@ -511,7 +565,7 @@ int FlashAction::Execute(int argc, char **argv)
 	}
 
 	// Open files
-	
+
 	FILE *pitFile = nullptr;
 	vector<PartitionFile> partitionFiles;
 
@@ -534,7 +588,7 @@ int FlashAction::Execute(int argc, char **argv)
 
 	// Perform flash
 
-	BridgeManager *bridgeManager = new BridgeManager(verbose);
+	BridgeManager *bridgeManager = new BridgeManager(verbose, waitForDevice);
 	bridgeManager->SetUsbLogLevel(usbLogLevel);
 
 	if (bridgeManager->Initialise(resume) != BridgeManager::kInitialiseSucceeded || !bridgeManager->BeginSession())
@@ -558,9 +612,11 @@ int FlashAction::Execute(int argc, char **argv)
 	if (success)
 	{
 		PitData *pitData = getPitData(bridgeManager, pitFile, repartition);
-	
+
 		if (pitData)
-			success = flashPartitions(bridgeManager, partitionFiles, pitData, repartition);
+			success = flashPartitions(bridgeManager, partitionFiles,
+						  pitData, repartition,
+						  skipSizeCheck);
 		else
 			success = false;
 
@@ -571,7 +627,7 @@ int FlashAction::Execute(int argc, char **argv)
 		success = false;
 
 	delete bridgeManager;
-	
+
 	closeFiles(partitionFiles, pitFile);
 
 	return (success ? 0 : 1);

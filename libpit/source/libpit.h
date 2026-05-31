@@ -25,12 +25,10 @@
 #pragma warning(disable : 4996)
 #endif
 
-#if (!(defined _MSC_VER) || (_MSC_VER < 1700))
-
-#ifndef nullptr
-#define nullptr 0
-#endif
-
+#if defined(_MSC_VER) && (_MSC_VER < 1700)
+# ifndef nullptr
+#  define nullptr 0
+# endif
 #endif
 
 // C/C++ Standard Library
@@ -63,14 +61,15 @@ namespace libpit
 				kDeviceTypeOneNand = 0,
 				kDeviceTypeFile, // FAT
 				kDeviceTypeMMC,
-				kDeviceTypeAll // ?
+				kDeviceTypeAll, // ?
+				kDeviceTypeUFS = 8
 			};
 
 			enum
 			{
 				kAttributeWrite = 1,
-				kAttributeSTL = 1 << 1/*,
-				kAttributeBML = 1 << 2*/ // ???
+				kAttributeSTL = 1 << 1
+				/* kAttributeBML = 1 << 2 */ // ???
 			};
 
 			enum
@@ -159,7 +158,7 @@ namespace libpit
 				this->updateAttributes = updateAttributes;
 			}
 			
-			// Different versions of Loke (secondary bootloaders) on different devices intepret this differently.
+			// Different versions of Loke (secondary bootloaders) on different devices interpret this differently.
 			unsigned int GetBlockSizeOrOffset(void) const
 			{
 				return blockSizeOrOffset;
@@ -263,17 +262,11 @@ namespace libpit
 		private:
 
 			unsigned int entryCount; // 0x04
-			unsigned int unknown1;   // 0x08
-			unsigned int unknown2;   // 0x0C
+			char com_tar2[8+1];      // 0x08
 
-			unsigned short unknown3; // 0x10
-			unsigned short unknown4; // 0x12
+			char cpu_bl_id[8+1];     // 0x10
 
-			unsigned short unknown5; // 0x14
-			unsigned short unknown6; // 0x16
-
-			unsigned short unknown7; // 0x18
-			unsigned short unknown8; // 0x1A
+			unsigned short luCount;  // 0x18
 
 			// Entries start at 0x1C
 			std::vector<PitEntry *> entries;
@@ -372,44 +365,19 @@ namespace libpit
 				return paddedSize;
 			}
 
-			unsigned int GetUnknown1(void) const
+			const char * GetComTar2(void) const
 			{
-				return unknown1;
+				return com_tar2;
 			}
 
-			unsigned int GetUnknown2(void) const
+			const char * GetCpuBlId(void) const
 			{
-				return unknown2;
+				return cpu_bl_id;
 			}
 
-			unsigned short GetUnknown3(void) const
+			unsigned int GetLUCount(void) const
 			{
-				return unknown3;
-			}
-
-			unsigned short GetUnknown4(void) const
-			{
-				return unknown4;
-			}
-
-			unsigned short GetUnknown5(void) const
-			{
-				return unknown5;
-			}
-
-			unsigned short GetUnknown6(void) const
-			{
-				return unknown6;
-			}
-
-			unsigned short GetUnknown7(void) const
-			{
-				return unknown7;
-			}
-
-			unsigned short GetUnknown8(void) const
-			{
-				return unknown8;
+				return luCount;
 			}
 	};
 }

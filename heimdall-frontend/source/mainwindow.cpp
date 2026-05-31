@@ -24,7 +24,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QProcess>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QUrl>
 
 // Heimdall Frontend
@@ -264,6 +264,7 @@ void MainWindow::UpdateFlashInterfaceAvailability(void)
 		startFlashButton->setEnabled(validFlashSettings);
 		noRebootCheckBox->setEnabled(validFlashSettings);
 		resumeCheckbox->setEnabled(validFlashSettings);
+		waitForDeviceCheckbox->setEnabled(validFlashSettings);
 	}
 	else
 	{
@@ -398,6 +399,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
 	verboseOutput = false;
 	resume = false;
+	waitForDevice = false;
 
 	tabIndex = functionTabWidget->currentIndex();
 	functionTabWidget->setTabEnabled(functionTabWidget->indexOf(createPackageTab), false);
@@ -405,7 +407,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 	QObject::connect(functionTabWidget, SIGNAL(currentChanged(int)), this, SLOT(FunctionTabChanged(int)));
 	
 	// Menu
-	QObject::connect(actionDonate, SIGNAL(triggered()), this, SLOT(OpenDonationWebpage()));
 	QObject::connect(actionVerboseOutput, SIGNAL(toggled(bool)), this, SLOT(SetVerboseOutput(bool)));
 	QObject::connect(actionResumeConnection, SIGNAL(toggled(bool)), this, SLOT(SetResume(bool)));
 	QObject::connect(actionAboutHeimdall, SIGNAL(triggered()), this, SLOT(ShowAbout()));
@@ -430,6 +431,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
 	QObject::connect(noRebootCheckBox, SIGNAL(stateChanged(int)), this, SLOT(SetNoReboot(int)));
 	QObject::connect(resumeCheckbox, SIGNAL(stateChanged(int)), this, SLOT(SetResume(int)));
+	QObject::connect(waitForDeviceCheckbox, SIGNAL(stateChanged(int)), this, SLOT(SetWaitForDevice(int)));
 	
 	QObject::connect(startFlashButton, SIGNAL(clicked()), this, SLOT(StartFlash()));
 
@@ -472,7 +474,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 	// Heimdall Command Line
 	QObject::connect(&heimdallProcess, SIGNAL(readyRead()), this, SLOT(HandleHeimdallStdout()));
 	QObject::connect(&heimdallProcess, SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(HandleHeimdallReturned(int, QProcess::ExitStatus)));
-	QObject::connect(&heimdallProcess, SIGNAL(error(QProcess::ProcessError)), this, SLOT(HandleHeimdallError(QProcess::ProcessError)));
+	QObject::connect(&heimdallProcess, SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(HandleHeimdallError(QProcess::ProcessError)));
 }
 
 MainWindow::~MainWindow()
@@ -481,7 +483,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::OpenDonationWebpage(void)
 {
-	QDesktopServices::openUrl(QUrl("http://www.glassechidna.com.au/donate/", QUrl::StrictMode));
+	QDesktopServices::openUrl(QUrl("https://www.glassechidna.com.au/donate/", QUrl::StrictMode));
 }
 
 void MainWindow::SetVerboseOutput(bool enabled)
@@ -900,6 +902,17 @@ void MainWindow::SetResume(int enabled)
 	SetResume(enabled != 0);
 }
 
+void MainWindow::SetWaitForDevice(bool enabled)
+{
+	waitForDevice = enabled;
+	waitForDeviceCheckbox->setChecked(enabled);
+}
+
+void MainWindow::SetWaitForDevice(int enabled)
+{
+	SetWaitForDevice(enabled != 0);
+}
+
 void MainWindow::StartFlash(void)
 {
 	outputPlainTextEdit->clear();
@@ -909,7 +922,7 @@ void MainWindow::StartFlash(void)
 
 	const FirmwareInfo& firmwareInfo = workingPackageData.GetFirmwareInfo();
 	const QList<FileInfo>& fileInfos = firmwareInfo.GetFileInfos();
-	
+
 	QStringList arguments;
 	arguments.append("flash");
 
@@ -922,8 +935,7 @@ void MainWindow::StartFlash(void)
 	for (int i = 0; i < fileInfos.length(); i++)
 	{
 		QString flag;
-		flag.sprintf("--%u", fileInfos[i].GetPartitionId());
-
+		flag = QString::asprintf("--%u", fileInfos[i].GetPartitionId());
 		arguments.append(flag);
 		arguments.append(fileInfos[i].GetFilename());
 	}
@@ -936,6 +948,9 @@ void MainWindow::StartFlash(void)
 
 	if (resume)
 		arguments.append("--resume");
+
+	if (waitForDevice)
+		arguments.append("--wait");
 
 	if (verboseOutput)
 		arguments.append("--verbose");
@@ -1068,9 +1083,9 @@ void MainWindow::BuildPackage(void)
 			if (packagePath.endsWith(".tar", Qt::CaseInsensitive))
 				packagePath.append(".gz");
 			else if (packagePath.endsWith(".gz", Qt::CaseInsensitive))
-				packagePath.replace(packagePath.length() - 3, ".tar.gz");
+				packagePath.replace(packagePath.length() - 3, 3, ".tar.gz");
 			else if (packagePath.endsWith(".tgz", Qt::CaseInsensitive))
-				packagePath.replace(packagePath.length() - 4, ".tar.gz");
+				packagePath.replace(packagePath.length() - 4, 4, ".tar.gz");
 			else
 				packagePath.append(".tar.gz");
 		}
@@ -1089,6 +1104,9 @@ void MainWindow::DetectDevice(void)
 	
 	QStringList arguments;
 	arguments.append("detect");
+
+	if (waitForDevice)
+		arguments.append("--wait");
 
 	if (verboseOutput)
 		arguments.append("--verbose");
@@ -1110,6 +1128,9 @@ void MainWindow::ClosePcScreen(void)
 	
 	if (resume)
 		arguments.append("--resume");
+
+	if (waitForDevice)
+		arguments.append("--wait");
 
 	if (verboseOutput)
 		arguments.append("--verbose");
@@ -1152,6 +1173,9 @@ void MainWindow::DownloadPit(void)
 
 	if (resume)
 		arguments.append("--resume");
+
+	if (waitForDevice)
+		arguments.append("--wait");
 
 	if (verboseOutput)
 		arguments.append("--verbose");
@@ -1232,14 +1256,19 @@ void MainWindow::HandleHeimdallStdout(void)
 
 	// We often receive multiple lots of output from Heimdall at one time. So we use regular expressions
 	// to ensure we don't miss out on any important information.
-	QRegExp uploadingExp("Uploading [^\n]+\n");
-	if (output.lastIndexOf(uploadingExp) > -1)
-		flashLabel->setText(uploadingExp.cap().left(uploadingExp.cap().length() - 1));
-
-	QRegExp percentExp("[\b\n][0-9]+%");
-	if (output.lastIndexOf(percentExp) > -1)
+	QRegularExpression uploadingExp("Uploading [^\n]+\n");
+	QRegularExpressionMatch match = uploadingExp.match(output);
+	if (match.hasMatch())
 	{
-		QString percentString = percentExp.cap();
+		QString matchStr = match.captured(0);
+		flashLabel->setText(matchStr.left(matchStr.length() - 1));
+	}
+
+	QRegularExpression percentExp("[\b\n][0-9]+%");
+	match = percentExp.match(output);
+	if (match.hasMatch())
+	{
+		QString percentString = match.captured(0);
 		flashProgressBar->setValue(percentString.mid(1, percentString.length() - 2).toInt());
 	}
 

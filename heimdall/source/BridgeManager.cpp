@@ -20,6 +20,7 @@
 
 // C Standard Library
 #include <cstdio>
+#include <fstream>
 
 // libusb
 #include <libusb.h>
@@ -77,31 +78,42 @@ enum
 
 int BridgeManager::FindDeviceInterface(void)
 {
-	Interface::Print("Detecting device...\n");
+	if (waitForDevice)
+		Interface::Print("Waiting for device...\n");
+	else
+		Interface::Print("Detecting device...\n");
 
 	struct libusb_device **devices;
-	int deviceCount = libusb_get_device_list(libusbContext, &devices);
-
-	for (int deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
+	unsigned int deviceCount, deviceIndex, i;
+	libusb_device_descriptor descriptor;
+	while (true)
 	{
-		libusb_device_descriptor descriptor;
-		libusb_get_device_descriptor(devices[deviceIndex], &descriptor);
+		deviceCount = libusb_get_device_list(libusbContext, &devices);
 
-		for (int i = 0; i < BridgeManager::kSupportedDeviceCount; i++)
+		for (deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
 		{
-			if (descriptor.idVendor == supportedDevices[i].vendorId && descriptor.idProduct == supportedDevices[i].productId)
+			libusb_get_device_descriptor(devices[deviceIndex], &descriptor);
+
+			for (i = 0; i < BridgeManager::kSupportedDeviceCount; i++)
 			{
-				heimdallDevice = devices[deviceIndex];
-				libusb_ref_device(heimdallDevice);
-				break;
+				if (descriptor.idVendor == supportedDevices[i].vendorId &&
+				    descriptor.idProduct == supportedDevices[i].productId)
+				{
+					heimdallDevice = devices[deviceIndex];
+					libusb_ref_device(heimdallDevice);
+					break;
+				}
 			}
 		}
-
 		if (heimdallDevice)
 			break;
-	}
 
-	libusb_free_device_list(devices, deviceCount);
+		libusb_free_device_list(devices, deviceCount);
+		if (waitForDevice)
+			Sleep(1000);
+		else
+			break;
+	}
 
 	if (!heimdallDevice)
 	{
@@ -259,9 +271,16 @@ bool BridgeManager::ClaimDeviceInterface(void)
 
 bool BridgeManager::SetupDeviceInterface(void)
 {
+	// if altSettingIndex is 0 there should be no need
+	// to set alt_setting(?)
+	if (altSettingIndex == 0)
+		return (true);
+
 	Interface::Print("Setting up interface...\n");
 
-	int result = libusb_set_interface_alt_setting(deviceHandle, interfaceIndex, altSettingIndex);
+	int result = libusb_set_interface_alt_setting(deviceHandle,
+						      interfaceIndex,
+						      altSettingIndex);
 
 	if (result != LIBUSB_SUCCESS)
 	{
@@ -303,9 +322,20 @@ bool BridgeManager::InitialiseProtocol(void)
 	memcpy(dataBuffer, "ODIN", 4);
 	memset(dataBuffer + 4, 0, 1);
 
+#ifdef OS_LINUX
+	if (IsUbuntu())
+	{
+		Interface::Print("Resetting device...\n");
+		if (libusb_reset_device(deviceHandle))
+		{
+			Interface::PrintError("Failed to reset device!\n");
+		}
+	}
+#endif
+
 	if (!SendBulkTransfer(dataBuffer, 4, 1000))
 	{
-		Interface::PrintError("Failed to send handshake!");
+		Interface::PrintError("Failed to send handshake!\n");
 	}
 
 	// Expect "LOKE"
@@ -341,9 +371,10 @@ bool BridgeManager::InitialiseProtocol(void)
 	return (false);
 }
 
-BridgeManager::BridgeManager(bool verbose)
+BridgeManager::BridgeManager(bool verbose, bool waitForDevice)
 {
 	this->verbose = verbose;
+	this->waitForDevice = waitForDevice;
 
 	libusbContext = nullptr;
 	deviceHandle = nullptr;
@@ -395,53 +426,42 @@ bool BridgeManager::DetectDevice(void)
 		return (false);
 	}
 
-	// Setup libusb log level.
-	switch (usbLogLevel)
-	{
-		case UsbLogLevel::None:
-			libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_NONE);
-			break;
+	if (waitForDevice)
+		Interface::Print("Waiting for device...\n");
 
-		case UsbLogLevel::Error:
-			libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_ERROR);
-			break;
+	// Set libusb log level.
+	SetUsbLogLevel(usbLogLevel);
 
-		case UsbLogLevel::Warning:
-			libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_WARNING);
-			break;
-
-		case UsbLogLevel::Info:
-			libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_INFO);
-			break;
-
-		case UsbLogLevel::Debug:
-			libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_DEBUG);
-			break;
-	}
-
-	// Get handle to Galaxy S device
 	struct libusb_device **devices;
-	int deviceCount = libusb_get_device_list(libusbContext, &devices);
-
-	for (int deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
+	unsigned int deviceCount, deviceIndex, i;
+	libusb_device_descriptor descriptor;
+	while (true)
 	{
-		libusb_device_descriptor descriptor;
-		libusb_get_device_descriptor(devices[deviceIndex], &descriptor);
+		deviceCount = libusb_get_device_list(libusbContext, &devices);
 
-		for (int i = 0; i < BridgeManager::kSupportedDeviceCount; i++)
+		for (deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
 		{
-			if (descriptor.idVendor == supportedDevices[i].vendorId && descriptor.idProduct == supportedDevices[i].productId)
-			{
-				libusb_free_device_list(devices, deviceCount);
+			libusb_get_device_descriptor(devices[deviceIndex], &descriptor);
 
-				Interface::Print("Device detected\n");
-				return (true);
+			for (i = 0; i < BridgeManager::kSupportedDeviceCount; i++)
+			{
+				if (descriptor.idVendor == supportedDevices[i].vendorId &&
+				    descriptor.idProduct == supportedDevices[i].productId)
+				{
+					libusb_free_device_list(devices, deviceCount);
+
+					Interface::Print("Device detected\n");
+					return (true);
+				}
 			}
 		}
+
+		libusb_free_device_list(devices, deviceCount);
+		if (waitForDevice)
+			Sleep(1000);
+		else
+			break;
 	}
-
-	libusb_free_device_list(devices, deviceCount);
-
 	Interface::PrintDeviceDetectionFailed();
 	return (false);
 }
@@ -456,34 +476,16 @@ int BridgeManager::Initialise(bool resume)
 	if (result != LIBUSB_SUCCESS)
 	{
 		Interface::PrintError("Failed to initialise libusb. libusb error: %d\n", result);
-		Interface::Print("Failed to connect to device!");
+		Interface::Print("Failed to connect to device!\n");
 		return (BridgeManager::kInitialiseFailed);
 	}
 
+	// Fixes LIBUSB_ERROR_NOT_FOUND when using dg_ssudbus driver instead of WinUSB.
+	libusb_set_option(libusbContext, LIBUSB_OPTION_USE_USBDK);
+
 	// Setup libusb log level.
-	switch (usbLogLevel)
-	{
-		case UsbLogLevel::None:
-			libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_NONE);
-			break;
+	SetUsbLogLevel(usbLogLevel);
 
-		case UsbLogLevel::Error:
-			libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_ERROR);
-			break;
-
-		case UsbLogLevel::Warning:
-			libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_WARNING);
-			break;
-
-		case UsbLogLevel::Info:
-			libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_INFO);
-			break;
-
-		case UsbLogLevel::Debug:
-			libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_DEBUG);
-			break;
-	}
-	
 	result = FindDeviceInterface();
 
 	if (result != BridgeManager::kInitialiseSucceeded)
@@ -737,7 +739,7 @@ bool BridgeManager::ReceivePacket(InboundPacket *packet, int timeout, int emptyT
 	if (receivedSize < 0)
 		return (false);
 
-	if (receivedSize != packet->GetSize() && !packet->IsSizeVariable())
+	if (static_cast<unsigned int>(receivedSize) != packet->GetSize() && !packet->IsSizeVariable())
 	{
 		if (verbose)
 			Interface::PrintError("Incorrect packet size received - expected size = %d, received size = %d.\n", packet->GetSize(), receivedSize);
@@ -937,7 +939,7 @@ int BridgeManager::ReceivePitFile(unsigned char **pitBuffer) const
 		}
 
 		int receiveEmptyTransferFlags = (i == transferCount - 1) ? kEmptyTransferAfter : kEmptyTransferNone;
-		
+
 		ReceiveFilePartPacket *receiveFilePartPacket = new ReceiveFilePartPacket();
 		success = ReceivePacket(receiveFilePartPacket, kDefaultTimeoutReceive, receiveEmptyTransferFlags);
 
@@ -1024,7 +1026,7 @@ bool BridgeManager::SendFile(FILE *file, unsigned int destination, unsigned int 
 	}
 
 	FileSeek(file, 0, SEEK_END);
-	unsigned int fileSize = (unsigned int)FileTell(file);
+	unsigned long fileSize = (unsigned long)FileTell(file);
 	FileRewind(file);
 
 	ResponsePacket *fileTransferResponse = new ResponsePacket(ResponsePacket::kResponseTypeFileTransfer);
@@ -1052,7 +1054,7 @@ bool BridgeManager::SendFile(FILE *file, unsigned int destination, unsigned int 
 			lastSequenceSize++;
 	}
 
-	unsigned int bytesTransferred = 0;
+	unsigned long bytesTransferred = 0;
 	unsigned int currentPercent;
 	unsigned int previousPercent = 0;
 	Interface::Print("0%%");
@@ -1105,7 +1107,7 @@ bool BridgeManager::SendFile(FILE *file, unsigned int destination, unsigned int 
 			// Response
 			SendFilePartResponse *sendFilePartResponse = new SendFilePartResponse();
 			success = ReceivePacket(sendFilePartResponse);
-			int receivedPartIndex = sendFilePartResponse->GetPartIndex();
+			unsigned int receivedPartIndex = sendFilePartResponse->GetPartIndex();
 
 			delete sendFilePartResponse;
 
@@ -1244,24 +1246,53 @@ void BridgeManager::SetUsbLogLevel(UsbLogLevel usbLogLevel)
 		switch (usbLogLevel)
 		{
 			case UsbLogLevel::None:
-				libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_NONE);
+				libusb_set_option(libusbContext, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_NONE);
 				break;
 
 			case UsbLogLevel::Error:
-				libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_ERROR);
+				libusb_set_option(libusbContext, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_ERROR);
 				break;
 
 			case UsbLogLevel::Warning:
-				libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_WARNING);
+				libusb_set_option(libusbContext, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_WARNING);
 				break;
 
 			case UsbLogLevel::Info:
-				libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_INFO);
+				libusb_set_option(libusbContext, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_INFO);
 				break;
 
 			case UsbLogLevel::Debug:
-				libusb_set_debug(libusbContext, LIBUSB_LOG_LEVEL_DEBUG);
+				libusb_set_option(libusbContext, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_DEBUG);
 				break;
 		}
 	}
 }
+
+#ifdef OS_LINUX
+bool BridgeManager::IsUbuntu()
+{
+	std::ifstream os_release("/etc/os-release");
+	std::string line, entry, os;
+	int pos;
+	while (std::getline(os_release, line))
+	{
+		pos = line.find("=");
+		entry = line.substr(0, pos);
+		if (entry == "ID")
+		{
+			os = line.substr(pos+1);
+			if (verbose)
+			{
+				Interface::Print("Linux distro ID: %s\n",
+						 os.c_str());
+			}
+			if (os == "ubuntu")
+			{
+				return true;
+			}
+			break;
+		}
+	}
+	return false;
+}
+#endif

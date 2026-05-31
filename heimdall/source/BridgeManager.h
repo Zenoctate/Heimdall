@@ -109,6 +109,7 @@ namespace Heimdall
 			static const DeviceIdentifier supportedDevices[kSupportedDeviceCount];
 
 			bool verbose;
+			bool waitForDevice;
 
 			libusb_context *libusbContext;
 			libusb_device_handle *deviceHandle;
@@ -145,7 +146,7 @@ namespace Heimdall
 
 		public:
 
-			BridgeManager(bool verbose);
+			BridgeManager(bool verbose, bool waitForDevice);
 			~BridgeManager();
 
 			bool DetectDevice(void);
@@ -166,7 +167,9 @@ namespace Heimdall
 			bool SendFile(FILE *file, unsigned int destination, unsigned int deviceType, unsigned int fileIdentifier = 0xFFFFFFFF) const;
 
 			void SetUsbLogLevel(UsbLogLevel usbLogLevel);
-
+#ifdef OS_LINUX
+			bool IsUbuntu(void);
+#endif
 			UsbLogLevel GetUsbLogLevel(void) const
 			{
 				return usbLogLevel;

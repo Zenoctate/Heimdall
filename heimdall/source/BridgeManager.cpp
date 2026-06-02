@@ -269,6 +269,26 @@ bool BridgeManager::ClaimDeviceInterface(void)
 	return (true);
 }
 
+bool BridgeManager::SetupDeviceConfiguration(void)
+{
+	Interface::Print("Setting up configuration...\n");
+
+	int result = libusb_set_configuration(deviceHandle, 1);
+    // libusb_clear_halt(deviceHandle, 0x81);
+    // libusb_clear_halt(deviceHandle, 1);
+    // libusb_clear_halt(deviceHandle, 0x82);
+
+
+	if (result != LIBUSB_SUCCESS)
+	{
+		Interface::PrintError("Setting up configuration failed!\n");
+		return (false);
+	}
+
+	Interface::Print("\n");
+	return (true);
+}
+
 bool BridgeManager::SetupDeviceInterface(void)
 {
 	// if altSettingIndex is 0 there should be no need
@@ -491,11 +511,14 @@ int BridgeManager::Initialise(bool resume)
 	if (result != BridgeManager::kInitialiseSucceeded)
 		return (result);
 
+	if(!SetupDeviceConfiguration())
+		return (BridgeManager::kInitialiseFailed);
+
 	if (!ClaimDeviceInterface())
 		return (BridgeManager::kInitialiseFailed);
 
-	if (!SetupDeviceInterface())
-		return (BridgeManager::kInitialiseFailed);
+	// if (!SetupDeviceInterface())
+	// 	return (BridgeManager::kInitialiseFailed);
 
 	if (!resume)
 	{
@@ -711,7 +734,7 @@ bool BridgeManager::SendPacket(OutboundPacket *packet, int timeout, int emptyTra
 	}
 
 	if (!SendBulkTransfer(packet->GetData(), packet->GetSize(), timeout))
-		return (false);
+			return (false);
 
 	if (emptyTransferFlags & kEmptyTransferAfter)
 	{
